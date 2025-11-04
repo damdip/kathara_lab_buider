@@ -1,4 +1,4 @@
-## Kathara Lab Creator — versione semplificata
+## Kathara Lab Creator — versione semplificata - generato con gpt mini 5
 
 Un piccolo strumento Python per creare rapidamente laboratori Kathara.
 Questo progetto genera la struttura di base dei laboratori (cartella
@@ -115,12 +115,6 @@ kathara lstart
 ```bash
 kathara lclean
 ```
-
-## Contatti
-
-Se vuoi migliorare lo script o hai domande, apri una issue nel repository
-o contatta l'autore del progetto.
-
 ---
 
 Grazie per aver usato Kathara Lab Creator — spero renda la creazione dei tuoi
