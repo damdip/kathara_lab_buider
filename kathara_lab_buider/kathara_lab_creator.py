@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 """
 Kathara Lab Creator - Versione semplificata
-Crea file lab.conf per laboratori Kathara
-
-Passo 1: Gestione dispositivi e creazione lab.conf
-Passo 2: Creazione file .startup per ogni dispositivo
+Crea file lab.conf e startup e file di configurazione delle macchine
+per laboratori Kathara
 """
 
 import os
@@ -77,9 +75,16 @@ def get_devices():
                 print("❌ Nome già esistente! Scegli un nome diverso.")
                 continue
             
-            # Verifica caratteri validi (solo lettere, numeri, underscore)
-            if not device_name.replace('_', '').replace('-', '').isalnum():
+            # Verifica caratteri validi (lettere, numeri, underscore, trattino)
+            # Permette nomi come: r1, pc1, br1r, br2r, web-server, db_1, etc.
+            valid_chars = all(c.isalnum() or c in ('_', '-') for c in device_name)
+            if not valid_chars:
                 print("❌ Il nome può contenere solo lettere, numeri, - e _")
+                continue
+            
+            # Il nome deve iniziare con una lettera o numero (non con - o _)
+            if not device_name[0].isalnum():
+                print("❌ Il nome deve iniziare con una lettera o un numero")
                 continue
             
             devices.append(device_name)
@@ -396,16 +401,19 @@ def choose_routing_protocol(device_name):
     print("Quale protocollo di routing usa questo router?")
     print("1. OSPF (Open Shortest Path First)")
     print("2. RIP (Routing Information Protocol)")
+    print("3. BGP (Border Gateway Protocol)")
     
     while True:
-        choice = input("Scegli protocollo (1-2): ").strip()
+        choice = input("Scegli protocollo (1-3): ").strip()
         
         if choice == "1":
             return "ospf"
         elif choice == "2":
             return "rip"
+        elif choice == "3":
+            return "bgp"
         else:
-            print("❌ Scelta non valida! Scegli 1 o 2.")
+            print("❌ Scelta non valida! Scegli 1, 2 o 3.")
 
 def create_router_config_directories(device_name, routing_protocol, lab_path):
     """
