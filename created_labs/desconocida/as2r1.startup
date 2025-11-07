@@ -1,0 +1,9 @@
+#!/bin/bash
+
+# Configurazione interfacce di rete
+ip addr add 10.0.0.2/30 dev eth0
+ip addr add 20.0.0.9/30 dev eth1
+ip addr add 2.0.0.13/24 dev eth2
+
+# Avvio servizio FRR
+systemctl start frr
