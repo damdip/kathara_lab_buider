@@ -1,0 +1,7 @@
+#!/bin/bash
+
+# Configurazione interfacce di rete
+ip addr add 50.50.1.2/24 dev eth0
+ip route add default via 50.50.1.1 dev eth0
+# Avvio servizio Apache2
+systemctl start apache2

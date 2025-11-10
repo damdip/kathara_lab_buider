@@ -1,0 +1,8 @@
+#!/bin/bash
+
+# Configurazione interfacce di rete
+ip addr add 40.40.1.2/24 dev eth0
+
+# Configurazione rotte statiche
+ip route add default via 40.40.1.1
+
