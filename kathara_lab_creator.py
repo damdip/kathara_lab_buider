@@ -402,9 +402,11 @@ def choose_routing_protocol(device_name):
     print("1. OSPF (Open Shortest Path First)")
     print("2. RIP (Routing Information Protocol)")
     print("3. BGP (Border Gateway Protocol)")
+    print("4. BGP-OSPF (BGP + OSPF)")
+    print("5. BGP-RIP (BGP + RIP)")
     
     while True:
-        choice = input("Scegli protocollo (1-3): ").strip()
+        choice = input("Scegli protocollo (1-5): ").strip()
         
         if choice == "1":
             return "ospf"
@@ -412,8 +414,12 @@ def choose_routing_protocol(device_name):
             return "rip"
         elif choice == "3":
             return "bgp"
+        elif choice == "4":
+            return "bgp-ospf"
+        elif choice == "5":
+            return "bgp-rip"
         else:
-            print("❌ Scelta non valida! Scegli 1, 2 o 3.")
+            print("❌ Scelta non valida! Scegli 1, 2, 3, 4 o 5.")
 
 def create_router_config_directories(device_name, routing_protocol, lab_path):
     """
@@ -718,14 +724,12 @@ def main():
         # Interfacce del dispositivo
         interfaces, device_domains = get_device_interfaces(device)
         
-        # Configurazione IP e rotte in base al tipo
-        routing_protocol = None
+        # Configurazione IP in base al tipo
         ip_addresses = {}
         host_routes = []
         
         if is_router:
-            # Router: chiedi protocollo di routing e IP
-            routing_protocol = choose_routing_protocol(device)
+            # Router: chiedi IP
             if interfaces:
                 ip_addresses = get_router_ip_addresses(device, interfaces)
         elif is_host:
@@ -737,6 +741,11 @@ def main():
             # Server: chiedi solo IP
             if interfaces:
                 ip_addresses = get_host_server_ip_addresses(device, "server", interfaces)
+        
+        # Protocollo di routing (DOPO configurazione IP)
+        routing_protocol = None
+        if is_router:
+            routing_protocol = choose_routing_protocol(device)
         
         # Salva informazioni dispositivo
         devices_info[device] = {
@@ -756,72 +765,69 @@ def main():
     # Mostra riassunto
     show_summary(lab_name, devices_info, all_domains)
     
-    # Chiedi conferma
-    confirm = input("\nVuoi creare i file del laboratorio? (S/n): ").strip().lower()
-    if confirm != 'n':
-        # Crea file lab.conf
-        lab_conf_file = create_lab_conf(lab_name, devices_info, lab_path)
-        
-        # Crea file .startup
-        startup_files = create_startup_files(devices_info, lab_path)
-        
-        # Crea directory di configurazione per i router
-        router_configs_created = []
-        for device_name, device_data in devices_info.items():
-            if device_data.get('is_router') and device_data.get('routing_protocol'):
-                success = create_router_config_directories(
-                    device_name, 
-                    device_data['routing_protocol'], 
-                    lab_path
-                )
-                if success:
-                    router_configs_created.append(device_name)
-        
-        # Crea directory di configurazione per i server
-        server_configs_created = []
-        for device_name, device_data in devices_info.items():
-            if device_data.get('is_server'):
-                success = create_server_config_directories(
-                    device_name,
-                    lab_path
-                )
-                if success:
-                    server_configs_created.append(device_name)
-        
-        print(f"\n🎉 Laboratorio '{lab_name}' creato!")
-        print(f"📁 Directory: {lab_path.absolute()}")
-        print("📄 File generati:")
-        print(f"   • lab.conf")
-        print(f"   • {len(startup_files)} file .startup")
-        if router_configs_created:
-            print(f"   • {len(router_configs_created)} directory di configurazione router:")
-            for router in router_configs_created:
-                print(f"     - {router}/etc/frr/")
-        if server_configs_created:
-            print(f"   • {len(server_configs_created)} directory di configurazione server:")
-            for server in server_configs_created:
-                print(f"     - {server}/var/www/html/")
-        
-        print("\nProssimi passi:")
-        print("1. Modifica i file .startup per configurare gli IP")
-        if router_configs_created:
-            print("2. Personalizza i file di configurazione routing in <router>/etc/frr/")
-            print("3. Entra nella directory del laboratorio:")
-        else:
-            print("2. Entra nella directory del laboratorio:")
-        print(f"   cd created_labs/{lab_name}")
-        print(f"{3 if router_configs_created else 2}. Avvia il laboratorio:")
-        print("   kathara lstart")
-        print(f"{4 if router_configs_created else 3}. Per fermarlo:")
-        print("   kathara lclean")
-        
-        # Chiedi se mostrare il contenuto dei file
-        show_files = input("\nVuoi vedere il contenuto dei file generati? (S/n): ").strip().lower()
-        if show_files != 'n':
-            show_generated_files(lab_path, devices_info)
-        
+    # Genera sempre i file (nessuna conferma)
+    print("\n⚙️  Generazione file in corso...")
+    
+    # Crea file lab.conf
+    lab_conf_file = create_lab_conf(lab_name, devices_info, lab_path)
+    
+    # Crea file .startup
+    startup_files = create_startup_files(devices_info, lab_path)
+    
+    # Crea directory di configurazione per i router
+    router_configs_created = []
+    for device_name, device_data in devices_info.items():
+        if device_data.get('is_router') and device_data.get('routing_protocol'):
+            success = create_router_config_directories(
+                device_name, 
+                device_data['routing_protocol'], 
+                lab_path
+            )
+            if success:
+                router_configs_created.append(device_name)
+    
+    # Crea directory di configurazione per i server
+    server_configs_created = []
+    for device_name, device_data in devices_info.items():
+        if device_data.get('is_server'):
+            success = create_server_config_directories(
+                device_name,
+                lab_path
+            )
+            if success:
+                server_configs_created.append(device_name)
+    
+    print(f"\n🎉 Laboratorio '{lab_name}' creato!")
+    print(f"📁 Directory: {lab_path.absolute()}")
+    print("📄 File generati:")
+    print(f"   • lab.conf")
+    print(f"   • {len(startup_files)} file .startup")
+    if router_configs_created:
+        print(f"   • {len(router_configs_created)} directory di configurazione router:")
+        for router in router_configs_created:
+            print(f"     - {router}/etc/frr/")
+    if server_configs_created:
+        print(f"   • {len(server_configs_created)} directory di configurazione server:")
+        for server in server_configs_created:
+            print(f"     - {server}/var/www/html/")
+    
+    print("\nProssimi passi:")
+    print("1. Modifica i file .startup per configurare gli IP")
+    if router_configs_created:
+        print("2. Personalizza i file di configurazione routing in <router>/etc/frr/")
+        print("3. Entra nella directory del laboratorio:")
     else:
-        print("\n👋 Operazione annullata.")
+        print("2. Entra nella directory del laboratorio:")
+    print(f"   cd created_labs/{lab_name}")
+    print(f"{3 if router_configs_created else 2}. Avvia il laboratorio:")
+    print("   kathara lstart")
+    print(f"{4 if router_configs_created else 3}. Per fermarlo:")
+    print("   kathara lclean")
+    
+    # Chiedi se mostrare il contenuto dei file
+    show_files = input("\nVuoi vedere il contenuto dei file generati? (S/n): ").strip().lower()
+    if show_files != 'n':
+        show_generated_files(lab_path, devices_info)
 
 if __name__ == "__main__":
     try:
