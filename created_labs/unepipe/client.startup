@@ -1,0 +1,9 @@
+#!/bin/bash
+
+# Configurazione interfacce di rete
+# eth0 collegata al dominio L
+# ip addr add <INDIRIZZO_IP>/<NETMASK> dev eth0
+ip address add 8.8.8.8/24 dev eth0
+# Configurazione rotte statiche
+ip route add default via 8.8.8.1
+

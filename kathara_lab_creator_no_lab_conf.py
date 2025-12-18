@@ -99,35 +99,26 @@ def choose_device_type(device_name):
     print("1. Router (kathara/frr)")
     print("2. Host (kathara/base)")
     print("3. Server (kathara/base)")
-    print("4. BGP Datacenter Leaf (kathara/frr)")
-    print("5. BGP Datacenter Spine (kathara/frr)")
-    print("6. BGP Datacenter ToF (kathara/frr)")
     
     images = {
         "1": "kathara/frr",
         "2": "kathara/base", 
-        "3": "kathara/base",
-        "4": "kathara/frr",
-        "5": "kathara/frr",
-        "6": "kathara/frr"
+        "3": "kathara/base"
     }
     
     # Tipi considerati router (che necessitano configurazione routing)
-    router_types = {"1", "4", "5", "6"}
+    router_types = {"1"}
     server_types = {"3"}
-    datacenter_types = {"4": "bgp-datacenter-leaf", "5": "bgp-datacenter-spine", "6": "bgp-datacenter-tof"}
     
     while True:
-        choice = input("Scegli tipo (1-6): ").strip()
+        choice = input("Scegli tipo (1-3): ").strip()
         
         if choice in images:
             is_router = choice in router_types
             is_server = choice in server_types
-            # Se è un tipo datacenter, restituisci anche il protocollo
-            routing_protocol = datacenter_types.get(choice, None)
-            return images[choice], is_router, is_server, routing_protocol
+            return images[choice], is_router, is_server
         else:
-            print("❌ Scelta non valida! Scegli 1, 2, 3, 4, 5 o 6.")
+            print("❌ Scelta non valida! Scegli 1, 2 o 3.")
 
 
 
@@ -146,9 +137,12 @@ def choose_routing_protocol(device_name):
     print("3. BGP (Border Gateway Protocol)")
     print("4. BGP-OSPF (BGP + OSPF)")
     print("5. BGP-RIP (BGP + RIP)")
+    print("6. BGP Datacenter Leaf")
+    print("7. BGP Datacenter Spine")
+    print("8. BGP Datacenter ToF")
     
     while True:
-        choice = input("Scegli protocollo (1-5): ").strip()
+        choice = input("Scegli protocollo (1-8): ").strip()
         
         if choice == "1":
             return "ospf"
@@ -160,8 +154,43 @@ def choose_routing_protocol(device_name):
             return "bgp-ospf"
         elif choice == "5":
             return "bgp-rip"
+        elif choice == "6":
+            return "bgp-datacenter-leaf"
+        elif choice == "7":
+            return "bgp-datacenter-spine"
+        elif choice == "8":
+            return "bgp-datacenter-tof"
         else:
-            print("❌ Scelta non valida! Scegli 1, 2, 3, 4 o 5.")
+            print("❌ Scelta non valida! Scegli 1, 2, 3, 4, 5, 6, 7 o 8.")
+
+def choose_startup_type(device_name):
+    """Chiede quale tipo di file startup usare per il dispositivo"""
+    print(f"\n📄 Configurazione file startup per '{device_name}'")
+    print("Quale tipo di file startup vuoi usare?")
+    print("1. File base (systemctl start frr/apache2)")
+    print("2. Leaf startup (da fileStartup/leaf.startup)")
+    print("3. Container startup (da fileStartup/container.startup)")
+    print("4. Server startup (da fileStartup/server.startup)")
+    print("5. Leaf Bond startup (da fileStartup/leafBond.startup)")
+    print("6. Server Bond startup (da fileStartup/serverBond.startup)")
+    
+    while True:
+        choice = input("Scegli tipo startup (1-6): ").strip()
+        
+        if choice == "1":
+            return "base"
+        elif choice == "2":
+            return "leaf"
+        elif choice == "3":
+            return "container"
+        elif choice == "4":
+            return "server"
+        elif choice == "5":
+            return "leafBond"
+        elif choice == "6":
+            return "serverBond"
+        else:
+            print("❌ Scelta non valida! Scegli 1, 2, 3, 4, 5 o 6.")
 
 def create_router_config_directories(device_name, routing_protocol, lab_path):
     """
@@ -180,8 +209,12 @@ def create_router_config_directories(device_name, routing_protocol, lab_path):
         print(f"⚠️  Directory di configurazione {config_source_dir} non trovata!")
         return False
     
-    # Lista dei file da copiare
-    config_files = ["daemons", "frr.conf", "vtysh.conf"]
+    # Lista dei file da copiare (dipende dal tipo di protocollo)
+    # Per datacenter (leaf/spine/tof) usa bgpd.conf, per gli altri usa frr.conf
+    if "datacenter" in routing_protocol:
+        config_files = ["daemons", "bgpd.conf"]
+    else:
+        config_files = ["daemons", "frr.conf", "vtysh.conf"]
     
     # Copia ogni file
     copied_files = []
@@ -266,26 +299,44 @@ def create_startup_files(devices_info, lab_path):
     
     for device_name, device_data in devices_info.items():
         startup_filename = lab_path / f"{device_name}.startup"
+        startup_type = device_data.get('startup_type', 'base')
         is_router = device_data.get('is_router', False)
         is_server = device_data.get('is_server', False)
         
-        with open(startup_filename, 'w', encoding='utf-8') as f:
-            f.write("#!/bin/bash\n\n")
+        # Se il tipo è diverso da "base", copia il template
+        if startup_type != 'base':
+            template_file = Path("fileStartup") / f"{startup_type}.startup"
             
-            # Se è un router, aggiungi solo il comando per avviare FRR
-            if is_router:
-                f.write("# Avvio servizio FRR\n")
-                f.write("systemctl start frr\n")
-            
-            # Se è un server, aggiungi il comando per avviare Apache2
-            if is_server:
-                f.write("# Avvio servizio Apache2\n")
-                f.write("systemctl start apache2\n")
+            if template_file.exists():
+                shutil.copy2(template_file, startup_filename)
+                # Rendi il file eseguibile
+                startup_filename.chmod(0o755)
+                startup_files.append(startup_filename)
+                print(f"✅ Creato {device_name}.startup (template: {startup_type}.startup)")
+            else:
+                print(f"⚠️  Template {template_file} non trovato! Creo file base.")
+                # Fallback al file base
+                startup_type = 'base'
         
-        # Rendi il file eseguibile
-        startup_filename.chmod(0o755)
-        startup_files.append(startup_filename)
-        print(f"✅ Creato {device_name}.startup")
+        # Se il tipo è "base", genera il file standard
+        if startup_type == 'base':
+            with open(startup_filename, 'w', encoding='utf-8') as f:
+                f.write("#!/bin/bash\n\n")
+                
+                # Se è un router, aggiungi solo il comando per avviare FRR
+                if is_router:
+                    f.write("# Avvio servizio FRR\n")
+                    f.write("systemctl start frr\n")
+                
+                # Se è un server, aggiungi il comando per avviare Apache2
+                if is_server:
+                    f.write("# Avvio servizio Apache2\n")
+                    f.write("systemctl start apache2\n")
+            
+            # Rendi il file eseguibile
+            startup_filename.chmod(0o755)
+            startup_files.append(startup_filename)
+            print(f"✅ Creato {device_name}.startup (file base)")
     
     return startup_files
 
@@ -323,11 +374,14 @@ def show_summary(lab_name, devices_info):
         image = device_data['image']
         is_router = device_data.get('is_router', False)
         routing_protocol = device_data.get('routing_protocol', None)
+        startup_type = device_data.get('startup_type', 'base')
         
         print(f"  • {device_name} ({image})")
         
         if is_router and routing_protocol:
-            print(f"    └─ Protocollo: {routing_protocol.upper()}")
+            print(f"    ├─ Protocollo: {routing_protocol.upper()}")
+        
+        print(f"    └─ Startup: {startup_type}")
     
     print("=" * 50)
 
@@ -355,26 +409,17 @@ def main():
     for device in devices:
         print(f"\n--- Configurazione {device} ---")
         
-        # Tipo di dispositivo (ora restituisce anche routing_protocol per datacenter)
-        result = choose_device_type(device)
-        if len(result) == 4:
-            image, is_router, is_server, datacenter_protocol = result
-        else:
-            image, is_router, is_server = result
-            datacenter_protocol = None
-        
+        # Tipo di dispositivo
+        image, is_router, is_server = choose_device_type(device)
         is_host = not is_router and not is_server
         
         # Protocollo di routing
         routing_protocol = None
         if is_router:
-            # Se è un tipo datacenter, usa il protocollo già assegnato
-            if datacenter_protocol:
-                routing_protocol = datacenter_protocol
-                print(f"✅ Protocollo: {routing_protocol.upper()}")
-            else:
-                # Altrimenti chiedi quale protocollo
-                routing_protocol = choose_routing_protocol(device)
+            routing_protocol = choose_routing_protocol(device)
+        
+        # Tipo di file startup
+        startup_type = choose_startup_type(device)
         
         # Salva informazioni dispositivo
         devices_info[device] = {
@@ -382,7 +427,8 @@ def main():
             'is_router': is_router,
             'is_server': is_server,
             'is_host': is_host,
-            'routing_protocol': routing_protocol
+            'routing_protocol': routing_protocol,
+            'startup_type': startup_type
         }
     
     # Mostra riassunto

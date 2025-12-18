@@ -1,0 +1,4 @@
+#!/bin/bash
+
+# Avvio servizio FRR
+systemctl start frr

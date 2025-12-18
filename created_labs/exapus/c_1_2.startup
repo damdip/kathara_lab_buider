@@ -1,0 +1,5 @@
+#!/bin/bash
+ip address add 100.0.0.2/24 dev eth0
+ip link set dev eth0 mtu 1450
+# Avvio servizio Apache2
+systemctl start apache2
